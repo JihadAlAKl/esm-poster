@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
+  </head>
+  <body style="margin: 0; overflow: hidden;">
+    <a-scene embedded arjs>
+      <!-- Replace "test.patt" with your marker pattern file -->
+      <a-marker type="pattern" url="yourmarker.patt">
+        <!-- Add an animated GIF texture to a plane -->
+        <a-plane 
+          src="#animatedGif" 
+          position="0 0 0" 
+          rotation="-90 0 0"
+          width="1" 
+          height="1">
+        </a-plane>
+      </a-marker>
+
+      <a-assets>
+        <!-- Preload the GIF as a texture -->
+        <img id="animatedGif" src="test.gif" crossorigin="anonymous">
+      </a-assets>
+
+      <a-entity camera></a-entity>
+    </a-scene>
+  </body>
+</html>
