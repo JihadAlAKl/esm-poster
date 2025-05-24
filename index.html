@@ -1,76 +1,101 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <title>AR.js – single looping video (flat)</title>
+<head>
+  <meta charset="utf-8" />
+  <title>AR.js – one looping video anchored in world</title>
 
-    <!-- A-Frame + AR.js -->
-    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
+  <!-- A-Frame + AR.js -->
+  <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
 
-    <script>
-      let videoPlane = null;                 // we still spawn exactly ONE plane
-      const CORRECTION_Q = new THREE.Quaternion()
-                            .setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0)); // –90° about X
+  <style>
+    body { margin:0; overflow:hidden; }
+    #status {
+      position:fixed; top:10px; left:10px;
+      padding:6px 12px; font:700 16px/1 sans-serif;
+      background:rgba(0,0,0,.55); color:#0f0;
+      border-radius:4px; display:none; user-select:none;
+    }
+  </style>
 
-      AFRAME.registerComponent('video-handler', {
-        init() {
-          const marker = this.el;
-          const scene  = marker.sceneEl;
+  <script>
+    AFRAME.registerComponent('video-handler', {
+      init() {
+        const marker  = this.el;
+        const scene   = marker.sceneEl;
+        const hud     = document.getElementById('status');
 
-          marker.addEventListener('markerFound', () => {
-            if (!videoPlane) {
-              const vid = document.querySelector('#markerVideo');
-              vid.loop  = true;
-              vid.muted = true;
-              vid.play();
+        this.videoPlane   = null;      // the single plane
+        this.readyReloc   = false;     // allow relocation after markerLost
 
-              videoPlane = document.createElement('a-plane');
-              videoPlane.setAttribute('material',
-                                      'src: #markerVideo; transparent: true;');
-              videoPlane.setAttribute('width', 1);        // matches marker size
-              videoPlane.setAttribute('height', 1);       // square marker (adjust if yours differs)
-              scene.appendChild(videoPlane);
-            }
-            this.updatePlanePose();                       // snap immediately
-          });
-        },
+        /* ---------- quaternion to correct orientation ----------
+           -90° about X   : lay flat on paper
+           +90° about Z   : turn video so top matches top of marker
+        */
+        const qFix = new THREE.Quaternion()
+                       .setFromEuler(new THREE.Euler(-Math.PI/2, 0,  Math.PI/2));
 
-        tick() { if (videoPlane) this.updatePlanePose(); },
+        // helper that positions / orients the existing plane
+        const placePlaneAtMarker = () => {
+          const obj = marker.object3D;
+          const planeObj = this.videoPlane.object3D;
 
-        updatePlanePose() {
-          const markerObj = this.el.object3D;
-          const planeObj  = videoPlane.object3D;
-
-          // position
           planeObj.position.copy(
-            markerObj.getWorldPosition(new THREE.Vector3())
+            obj.getWorldPosition(new THREE.Vector3())
           );
-
-          // orientation  = marker rotation × (–90° X-axis)
           planeObj.quaternion.copy(
-            markerObj.getWorldQuaternion(new THREE.Quaternion())
-          ).multiply(CORRECTION_Q);
-        }
-      });
-    </script>
-  </head>
+            obj.getWorldQuaternion(new THREE.Quaternion())
+          ).multiply(qFix);
+        };
 
-  <body style="margin:0; overflow:hidden;">
-    <a-scene embedded arjs="sourceType: webcam;">
-      <a-assets>
-        <video id="markerVideo"
-               src="test.mp4"
-               crossorigin="anonymous"
-               webkit-playsinline
-               playsinline
-               loop></video>
-      </a-assets>
+        /* ----- marker events ----- */
+        marker.addEventListener('markerFound', () => {
+          hud.style.display = 'block';
 
-      <!-- attach our component -->
-      <a-marker type="pattern" url="test.patt" video-handler></a-marker>
+          if (!this.videoPlane) {             // first time ever: build plane
+            const vid = document.querySelector('#markerVideo');
+            vid.muted = true;                 // autoplay on mobile
+            vid.loop  = true;
+            vid.play();
 
-      <a-entity camera></a-entity>
-    </a-scene>
-  </body>
+            this.videoPlane = document.createElement('a-plane');
+            this.videoPlane.setAttribute('material',
+              'src: #markerVideo; transparent: true;');
+            this.videoPlane.setAttribute('width', 1);      // 1×1 marker; tweak if yours differs
+            this.videoPlane.setAttribute('height', 1);
+            scene.appendChild(this.videoPlane);
+          }
+
+          if (!this.readyReloc) return;       // already placed & not allowed to relocate
+
+          placePlaneAtMarker();               // initial place or relocate
+          this.readyReloc = false;            // lock until markerLost
+        });
+
+        marker.addEventListener('markerLost', () => {
+          hud.style.display = 'none';
+          this.readyReloc  = true;            // next markerFound may reposition
+        });
+      }
+    });
+  </script>
+</head>
+
+<body>
+  <div id="status">DETECTED</div>
+
+  <a-scene embedded arjs="sourceType: webcam;">
+    <a-assets>
+      <video id="markerVideo"
+             src="test.mp4"
+             webkit-playsinline playsinline loop crossorigin="anonymous">
+      </video>
+    </a-assets>
+
+    <!-- your .patt marker with the custom component -->
+    <a-marker type="pattern" url="test.patt" video-handler></a-marker>
+
+    <a-entity camera></a-entity>
+  </a-scene>
+</body>
 </html>
