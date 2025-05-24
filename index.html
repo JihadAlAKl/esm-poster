@@ -2,14 +2,14 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>AR.js – auto portrait / landscape video</title>
+  <title>AR.js – one looping video anchored in world</title>
 
   <!-- A-Frame + AR.js -->
   <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
 
   <style>
-    body {margin:0; overflow:hidden;}
+    body { margin:0; overflow:hidden; }
     #status {
       position:fixed; top:10px; left:10px;
       padding:6px 12px; font:700 16px/1 sans-serif;
@@ -21,82 +21,61 @@
   <script>
     AFRAME.registerComponent('video-handler', {
       init() {
-        const marker = this.el;
-        const scene  = marker.sceneEl;
-        const hud    = document.getElementById('status');
+        const marker  = this.el;
+        const scene   = marker.sceneEl;
+        const hud     = document.getElementById('status');
 
-        this.videoPlane = null;
-        this.allowRelocate = false;          // let us move the plane after markerLost
+        this.videoPlane   = null;      // the single plane
+        this.readyReloc   = false;     // allow relocation after markerLost
 
-        const ROT_X_NEG_90 = new THREE.Quaternion()
-                              .setFromEuler(new THREE.Euler(-Math.PI/2, 0, 0));
+        /* ---------- quaternion to correct orientation ----------
+           -90° about X   : lay flat on paper
+           +90° about Z   : turn video so top matches top of marker
+        */
+        const qFix = new THREE.Quaternion()
+                       .setFromEuler(new THREE.Euler(-Math.PI/2, 0,  Math.PI/2));
 
-        /* ------------------------------------------------------------------
-         * Produce the final quaternion for the plane:
-         *   planeQ = markerQ × X(-90°) × Z(dynamic 0|90°)
-         * -----------------------------------------------------------------*/
-        const computePlaneQuaternion = (markerQ) => {
-          // marker yaw in radians (-π … π)
-          const yaw = new THREE.Euler().setFromQuaternion(markerQ, 'ZYX').z;
-          // is yaw an even multiple of 90°?   0,±180 → true  |  ±90 → false
-          const evenQuad = (Math.round(yaw / (Math.PI / 2)) & 1) === 0;
-          const rotZ = evenQuad ? Math.PI/2 : 0;
+        // helper that positions / orients the existing plane
+        const placePlaneAtMarker = () => {
+          const obj = marker.object3D;
+          const planeObj = this.videoPlane.object3D;
 
-          const q = markerQ.clone()
-                           .multiply(ROT_X_NEG_90)
-                           .multiply(new THREE.Quaternion()
-                                     .setFromAxisAngle(new THREE.Vector3(0,0,1), rotZ));
-          return q;
+          planeObj.position.copy(
+            obj.getWorldPosition(new THREE.Vector3())
+          );
+          planeObj.quaternion.copy(
+            obj.getWorldQuaternion(new THREE.Quaternion())
+          ).multiply(qFix);
         };
 
-        /* ---------------- helper: place or move the plane ---------------- */
-        const placePlane = () => {
-          if (!this.videoPlane) return;
-          const obj  = marker.object3D;
-          const pl   = this.videoPlane.object3D;
-
-          pl.position.copy(obj.getWorldPosition(new THREE.Vector3()));
-          pl.quaternion.copy( computePlaneQuaternion(obj.getWorldQuaternion(
-                                  new THREE.Quaternion())) );
-        };
-
-        /* -------------------- marker events -------------------- */
+        /* ----- marker events ----- */
         marker.addEventListener('markerFound', () => {
           hud.style.display = 'block';
 
-          if (!this.videoPlane) {            // first time – create everything
+          if (!this.videoPlane) {             // first time ever: build plane
             const vid = document.querySelector('#markerVideo');
-            vid.muted = true; vid.loop = true;
+            vid.muted = true;                 // autoplay on mobile
+            vid.loop  = true;
+            vid.play();
 
-            /* Wait for metadata so we know aspect ratio */
-            vid.addEventListener('loadedmetadata', () => {
-              const ar   = vid.videoWidth / vid.videoHeight || 1;  // width / height
-              const w    = ar >= 1 ? 1          : ar;   // longer side = 1
-              const h    = ar >= 1 ? 1 / ar     : 1;
-
-              this.videoPlane = document.createElement('a-plane');
-              this.videoPlane.setAttribute('material',
-                'src: #markerVideo; transparent: true;');
-              this.videoPlane.setAttribute('width',  w);
-              this.videoPlane.setAttribute('height', h);
-              scene.appendChild(this.videoPlane);
-
-              vid.play();
-              placePlane();                  // snap to current pose
-            }, {once:true});
-          } else if (this.allowRelocate) {
-            placePlane();                    // move existing plane
-            this.allowRelocate = false;
+            this.videoPlane = document.createElement('a-plane');
+            this.videoPlane.setAttribute('material',
+              'src: #markerVideo; transparent: true;');
+            this.videoPlane.setAttribute('width', 1);      // 1×1 marker; tweak if yours differs
+            this.videoPlane.setAttribute('height', 1);
+            scene.appendChild(this.videoPlane);
           }
+
+          if (!this.readyReloc) return;       // already placed & not allowed to relocate
+
+          placePlaneAtMarker();               // initial place or relocate
+          this.readyReloc = false;            // lock until markerLost
         });
 
         marker.addEventListener('markerLost', () => {
           hud.style.display = 'none';
-          this.allowRelocate = true;         // let plane follow image next time
+          this.readyReloc  = true;            // next markerFound may reposition
         });
-
-        /* every frame keep the plane glued to the latest pose */
-        this.tick = () => placePlane();
       }
     });
   </script>
@@ -107,14 +86,13 @@
 
   <a-scene embedded arjs="sourceType: webcam;">
     <a-assets>
-      <!-- Your MP4 (any aspect ratio) -->
       <video id="markerVideo"
              src="test4.mp4"
-             playsinline webkit-playsinline crossorigin="anonymous">
+             webkit-playsinline playsinline loop crossorigin="anonymous">
       </video>
     </a-assets>
 
-    <!-- Pattern marker with the component -->
+    <!-- your .patt marker with the custom component -->
     <a-marker type="pattern" url="test.patt" video-handler></a-marker>
 
     <a-entity camera></a-entity>
