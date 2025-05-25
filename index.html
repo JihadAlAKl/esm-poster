@@ -28,14 +28,9 @@
         this.videoPlane   = null;      // the single plane
         this.readyReloc   = false;     // allow relocation after markerLost
 
-        /* ---------- quaternion to correct orientation ----------
-           -90° about X   : lay flat on paper
-           +90° about Z   : turn video so top matches top of marker
-        */
         const qFix = new THREE.Quaternion()
                        .setFromEuler(new THREE.Euler(-Math.PI/2, 0,  Math.PI/2));
 
-        // helper that positions / orients the existing plane
         const placePlaneAtMarker = () => {
           const obj = marker.object3D;
           const planeObj = this.videoPlane.object3D;
@@ -48,33 +43,50 @@
           ).multiply(qFix);
         };
 
-        /* ----- marker events ----- */
         marker.addEventListener('markerFound', () => {
           hud.style.display = 'block';
 
-          if (!this.videoPlane) {             // first time ever: build plane
+          if (!this.videoPlane) {
             const vid = document.querySelector('#markerVideo');
-            vid.muted = true;                 // autoplay on mobile
+            vid.muted = true;
             vid.loop  = true;
             vid.play();
 
             this.videoPlane = document.createElement('a-plane');
             this.videoPlane.setAttribute('material',
               'src: #markerVideo; transparent: true;');
-            this.videoPlane.setAttribute('width', 1);      // 1×1 marker; tweak if yours differs
+            this.videoPlane.setAttribute('width', 1);
             this.videoPlane.setAttribute('height', 1);
             scene.appendChild(this.videoPlane);
           }
 
-          if (!this.readyReloc) return;       // already placed & not allowed to relocate
-
-          placePlaneAtMarker();               // initial place or relocate
-          this.readyReloc = false;            // lock until markerLost
+          if (!this.readyReloc) return;
+          placePlaneAtMarker();
+          this.readyReloc = false;
         });
 
         marker.addEventListener('markerLost', () => {
           hud.style.display = 'none';
-          this.readyReloc  = true;            // next markerFound may reposition
+          this.readyReloc  = true;
+        });
+      }
+    });
+
+    AFRAME.registerComponent('adjust-confidence', {
+      init: function () {
+        this.el.sceneEl.addEventListener('arjs-video-loaded', () => {
+          const arToolkitContext = this.el.sceneEl.systems["arjs"].arToolkitContext;
+
+          function trySetConfidence() {
+            if (arToolkitContext.arController) {
+              arToolkitContext.arController.setConfidenceThreshold(0.3); // less strict
+              console.log('Confidence threshold set to 0.3');
+            } else {
+              setTimeout(trySetConfidence, 100); // wait and try again
+            }
+          }
+
+          trySetConfidence();
         });
       }
     });
@@ -92,8 +104,7 @@
       </video>
     </a-assets>
 
-    <!-- your .patt marker with the custom component -->
-    <a-marker type="pattern" url="test.patt" video-handler></a-marker>
+    <a-marker type="pattern" url="test.patt" video-handler adjust-confidence></a-marker>
 
     <a-entity camera></a-entity>
   </a-scene>
