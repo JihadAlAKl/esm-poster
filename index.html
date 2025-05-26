@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AR.js – Pattern Detection Demo</title>
 
     <!-- A-Frame core -->
@@ -10,53 +11,101 @@
     <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.3/aframe/build/aframe-ar.js"></script>
 
     <style>
-      /* Simple floating status badge */
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        font-family: system-ui, sans-serif;
+      }
+
+      /* Floating status badge */
       #status {
         position: fixed;
-        top: 20px;
+        top: 1rem;
         left: 50%;
         transform: translateX(-50%);
-        padding: 0.5rem 1rem;
-        background: rgba(0, 0, 0, 0.8);
+        padding: 0.5rem 1.25rem;
+        background: rgba(0, 0, 0, 0.85);
         color: #fff;
         font-size: 1.25rem;
-        font-family: sans-serif;
-        border-radius: 0.5rem;
+        border-radius: 0.75rem;
         display: none; /* hidden until marker found */
         z-index: 1000;
+      }
+
+      /* Message shown when camera cannot be accessed */
+      #no-camera {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #111;
+        color: #f55;
+        font-size: 1.1rem;
+        text-align: center;
+        padding: 2rem;
       }
     </style>
   </head>
 
-  <body style="margin: 0; overflow: hidden">
-    <!-- On-screen message -->
+  <body>
+    <!-- On-screen feedback messages -->
     <div id="status">detected</div>
+    <div id="no-camera" hidden>
+      🚫 Unable to access the camera.<br />
+      Make sure you've granted permission and are loading this page over
+      <strong>https://</strong> (or <strong>http://localhost</strong>) rather than opening the
+      file directly.
+    </div>
 
     <!-- AR.js scene -->
-    <a-scene embedded arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;">
+    <a-scene
+      vr-mode-ui="enabled: false"
+      embedded
+      arjs="trackingMethod: best; sourceType: webcam; facingMode: environment; debugUIEnabled: false;"
+    >
       <!-- Pattern marker using your test.patt file -->
       <a-marker id="marker" type="pattern" url="test.patt">
-        <!-- Put any 3D content you want to show when the marker appears -->
-        <a-box position="0 0.5 0" rotation="0 45 0" material="color: tomato;"></a-box>
+        <!-- Replace / add your 3D content inside the marker -->
+        <a-box
+          position="0 0.5 0"
+          rotation="0 45 0"
+          material="color: tomato;"
+        ></a-box>
       </a-marker>
 
+      <!-- Mandatory camera entity -->
       <a-entity camera></a-entity>
     </a-scene>
 
     <script>
-      // Grab elements
       const marker = document.querySelector('#marker');
       const statusDiv = document.getElementById('status');
+      const noCamDiv = document.getElementById('no-camera');
 
-      // Show / hide the status indicator and log to console
+      // Show detected badge when marker appears
       marker.addEventListener('markerFound', () => {
         console.log('detected');
         statusDiv.style.display = 'block';
       });
-
       marker.addEventListener('markerLost', () => {
         statusDiv.style.display = 'none';
       });
+
+      // Detect camera access failure (AR.js fires this event)
+      document
+        .querySelector('a-scene')
+        .addEventListener('arjs-video-error', (e) => {
+          console.error('Camera initialization failed', e);
+          noCamDiv.hidden = false;
+        });
+
+      // Extra fallback for browsers that don't fire the above event
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        noCamDiv.hidden = false;
+      }
     </script>
   </body>
 </html>
