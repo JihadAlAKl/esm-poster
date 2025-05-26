@@ -2,91 +2,37 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>AR.js – one looping video anchored in world</title>
+  <title>AR.js – Marker Detection Only</title>
 
   <!-- A-Frame + AR.js -->
   <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
 
   <style>
-    body { margin:0; overflow:hidden; }
+    body { margin: 0; overflow: hidden; }
     #status {
-      position:fixed; top:10px; left:10px;
-      padding:6px 12px; font:700 16px/1 sans-serif;
-      background:rgba(0,0,0,.55); color:#0f0;
-      border-radius:4px; display:none; user-select:none;
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      padding: 6px 12px;
+      font: 700 16px/1 sans-serif;
+      background: rgba(0, 0, 0, 0.55);
+      color: #0f0;
+      border-radius: 4px;
+      display: none;
+      user-select: none;
     }
   </style>
 
   <script>
-    AFRAME.registerComponent('video-handler', {
+    AFRAME.registerComponent('marker-status', {
       init() {
-        const marker  = this.el;
-        const scene   = marker.sceneEl;
-        const hud     = document.getElementById('status');
-
-        this.videoPlane   = null;      // the single plane
-        this.readyReloc   = false;     // allow relocation after markerLost
-
-        const qFix = new THREE.Quaternion()
-                       .setFromEuler(new THREE.Euler(-Math.PI/2, 0,  Math.PI/2));
-
-        const placePlaneAtMarker = () => {
-          const obj = marker.object3D;
-          const planeObj = this.videoPlane.object3D;
-
-          planeObj.position.copy(
-            obj.getWorldPosition(new THREE.Vector3())
-          );
-          planeObj.quaternion.copy(
-            obj.getWorldQuaternion(new THREE.Quaternion())
-          ).multiply(qFix);
-        };
-
-        marker.addEventListener('markerFound', () => {
+        const hud = document.getElementById('status');
+        this.el.addEventListener('markerFound', () => {
           hud.style.display = 'block';
-
-          if (!this.videoPlane) {
-            const vid = document.querySelector('#markerVideo');
-            vid.muted = true;
-            vid.loop  = true;
-            vid.play();
-
-            this.videoPlane = document.createElement('a-plane');
-            this.videoPlane.setAttribute('material',
-              'src: #markerVideo; transparent: true;');
-            this.videoPlane.setAttribute('width', 1);
-            this.videoPlane.setAttribute('height', 1);
-            scene.appendChild(this.videoPlane);
-          }
-
-          if (!this.readyReloc) return;
-          placePlaneAtMarker();
-          this.readyReloc = false;
         });
-
-        marker.addEventListener('markerLost', () => {
+        this.el.addEventListener('markerLost', () => {
           hud.style.display = 'none';
-          this.readyReloc  = true;
-        });
-      }
-    });
-
-    AFRAME.registerComponent('adjust-confidence', {
-      init: function () {
-        this.el.sceneEl.addEventListener('arjs-video-loaded', () => {
-          const arToolkitContext = this.el.sceneEl.systems["arjs"].arToolkitContext;
-
-          function trySetConfidence() {
-            if (arToolkitContext.arController) {
-              arToolkitContext.arController.setConfidenceThreshold(0.3); // less strict
-              console.log('Confidence threshold set to 0.3');
-            } else {
-              setTimeout(trySetConfidence, 100); // wait and try again
-            }
-          }
-
-          trySetConfidence();
         });
       }
     });
@@ -97,14 +43,8 @@
   <div id="status">DETECTED</div>
 
   <a-scene embedded arjs="sourceType: webcam;">
-    <a-assets>
-      <video id="markerVideo"
-             src="test.mp4"
-             webkit-playsinline playsinline loop crossorigin="anonymous">
-      </video>
-    </a-assets>
-
-    <a-marker type="pattern" url="test.patt" video-handler adjust-confidence></a-marker>
+    <!-- Marker with custom component for detection status -->
+    <a-marker type="pattern" url="test.patt" marker-status></a-marker>
 
     <a-entity camera></a-entity>
   </a-scene>
