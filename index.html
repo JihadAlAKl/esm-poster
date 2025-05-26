@@ -1,52 +1,62 @@
 <!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>AR.js – Marker Detection Only</title>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>AR.js – Pattern Detection Demo</title>
 
-  <!-- A-Frame + AR.js -->
-  <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
+    <!-- A-Frame core -->
+    <script src="https://aframe.io/releases/1.4.1/aframe.min.js"></script>
+    <!-- AR.js for A-Frame (bundled build) -->
+    <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.3/aframe/build/aframe-ar.js"></script>
 
-  <style>
-    body { margin: 0; overflow: hidden; }
-    #status {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      padding: 6px 12px;
-      font: 700 16px/1 sans-serif;
-      background: rgba(0, 0, 0, 0.55);
-      color: #0f0;
-      border-radius: 4px;
-      display: none;
-      user-select: none;
-    }
-  </style>
-
-  <script>
-    AFRAME.registerComponent('marker-status', {
-      init() {
-        const hud = document.getElementById('status');
-        this.el.addEventListener('markerFound', () => {
-          hud.style.display = 'block';
-        });
-        this.el.addEventListener('markerLost', () => {
-          hud.style.display = 'none';
-        });
+    <style>
+      /* Simple floating status badge */
+      #status {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 0.5rem 1rem;
+        background: rgba(0, 0, 0, 0.8);
+        color: #fff;
+        font-size: 1.25rem;
+        font-family: sans-serif;
+        border-radius: 0.5rem;
+        display: none; /* hidden until marker found */
+        z-index: 1000;
       }
-    });
-  </script>
-</head>
+    </style>
+  </head>
 
-<body>
-  <div id="status">DETECTED</div>
+  <body style="margin: 0; overflow: hidden">
+    <!-- On-screen message -->
+    <div id="status">detected</div>
 
-  <a-scene embedded arjs="sourceType: webcam;">
-    <!-- Marker with custom component for detection status -->
-    <a-marker type="pattern" url="test.patt" marker-status></a-marker>
+    <!-- AR.js scene -->
+    <a-scene embedded arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;">
+      <!-- Pattern marker using your test.patt file -->
+      <a-marker id="marker" type="pattern" url="test.patt">
+        <!-- Put any 3D content you want to show when the marker appears -->
+        <a-box position="0 0.5 0" rotation="0 45 0" material="color: tomato;"></a-box>
+      </a-marker>
 
-    <a-entity camera></a-entity>
-  </a-scene>
-</body>
+      <a-entity camera></a-entity>
+    </a-scene>
+
+    <script>
+      // Grab elements
+      const marker = document.querySelector('#marker');
+      const statusDiv = document.getElementById('status');
+
+      // Show / hide the status indicator and log to console
+      marker.addEventListener('markerFound', () => {
+        console.log('detected');
+        statusDiv.style.display = 'block';
+      });
+
+      marker.addEventListener('markerLost', () => {
+        statusDiv.style.display = 'none';
+      });
+    </script>
+  </body>
 </html>
