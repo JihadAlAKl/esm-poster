@@ -1,167 +1,53 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AR.js – Pattern Detection Demo</title>
+<head>
+  <meta charset="utf-8" />
+  <title>AR.js – Pattern‑only Demo (simple)</title>
 
-    <!-- A-Frame core -->
-    <script src="https://aframe.io/releases/1.4.1/aframe.min.js"></script>
-    <!-- AR.js for A-Frame (bundled build) -->
-    <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.3/aframe/build/aframe-ar.js"></script>
+  <!-- A‑Frame core + AR.js (bundled build) -->
+  <script src="https://aframe.io/releases/1.4.1/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.3/aframe/build/aframe-ar.js"></script>
 
-    <style>
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
-        font-family: system-ui, sans-serif;
-      }
+  <style>
+    html,body { margin:0; overflow:hidden; font-family:sans-serif; }
+    #status {
+      position:fixed; top:10px; left:10px;
+      padding:6px 12px;
+      background:rgba(0,0,0,.6);
+      color:#0f0; font-weight:700;
+      border-radius:4px;
+      display:none;
+      user-select:none;
+      z-index:1000;
+    }
+  </style>
+</head>
+<body>
+  <!-- on‑screen label -->
+  <div id="status">DETECTED</div>
 
-      /* Floating status badge */
-      #status {
-        position: fixed;
-        top: 1rem;
-        left: 50%;
-        transform: translateX(-50%);
-        padding: 0.5rem 1.25rem;
-        background: rgba(0, 0, 0, 0.85);
-        color: #fff;
-        font-size: 1.25rem;
-        border-radius: 0.75rem;
-        display: none; /* hidden until marker found */
-        z-index: 1000;
-      }
+  <!-- AR scene -->
+  <a-scene
+    embedded
+    arjs="sourceType: webcam; facingMode: environment; debugUIEnabled: false;"
+  >
+    <!-- Pattern marker (replace test.patt with your file) -->
+    <a-marker id="marker" type="pattern" url="test.patt"></a-marker>
+    <a-entity camera></a-entity>
+  </a-scene>
 
-      /* Overlay that asks the user to start the camera (required on some browsers) */
-      #start-overlay {
-        position: fixed;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-direction: column;
-        background: #000;
-        color: #fff;
-        gap: 1.25rem;
-        z-index: 999;
-      }
+  <script>
+    const marker = document.querySelector('#marker');
+    const hud    = document.getElementById('status');
 
-      #start-button {
-        background: #16a34a;
-        border: none;
-        padding: 0.75rem 1.5rem;
-        border-radius: 0.5rem;
-        font-size: 1.25rem;
-        cursor: pointer;
-        transition: transform 0.2s ease;
-      }
-      #start-button:active {
-        transform: scale(0.96);
-      }
+    marker.addEventListener('markerFound', () => {
+      console.log('detected');
+      hud.style.display = 'block';
+    });
 
-      /* Message shown when camera cannot be accessed */
-      #no-camera {
-        position: fixed;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: #111;
-        color: #f55;
-        font-size: 1.1rem;
-        text-align: center;
-        padding: 2rem;
-      }
-    </style>
-  </head>
-
-  <body>
-    <!-- On‑screen feedback messages -->
-    <div id="status">detected</div>
-
-    <!-- Tap‑to‑start overlay (needed to trigger getUserMedia on some Chrome builds) -->
-    <div id="start-overlay">
-      <h2>👋 Tap to enable camera</h2>
-      <button id="start-button">Start AR</button>
-      <small>(Chrome requires user interaction over HTTPS or localhost)</small>
-    </div>
-
-    <div id="no-camera" hidden>
-      🚫 Unable to access the camera.<br />
-      Make sure you've granted permission and are loading this page over
-      <strong>https://</strong> (or <strong>http://localhost</strong>) rather than opening the
-      file directly.
-    </div>
-
-    <!-- AR.js scene (hidden until permission granted) -->
-    <a-scene
-      id="scene"
-      vr-mode-ui="enabled: false"
-      embedded
-      style="display: none;"
-      arjs="trackingMethod: best; sourceType: webcam; facingMode: environment; debugUIEnabled: false;"
-    >
-      <!-- Pattern marker using your test.patt file -->
-      <a-marker id="marker" type="pattern" url="test.patt">
-        <!-- Replace / add your 3D content inside the marker -->
-        <a-box
-          position="0 0.5 0"
-          rotation="0 45 0"
-          material="color: tomato;"
-        ></a-box>
-      </a-marker>
-
-      <!-- Mandatory camera entity -->
-      <a-entity camera></a-entity>
-    </a-scene>
-
-    <script>
-      const startOverlay = document.getElementById('start-overlay');
-      const startButton = document.getElementById('start-button');
-      const scene = document.getElementById('scene');
-      const marker = document.querySelector('#marker');
-      const statusDiv = document.getElementById('status');
-      const noCamDiv = document.getElementById('no-camera');
-
-      // Show detected badge when marker appears
-      marker.addEventListener('markerFound', () => {
-        console.log('detected');
-        statusDiv.style.display = 'block';
-      });
-      marker.addEventListener('markerLost', () => {
-        statusDiv.style.display = 'none';
-      });
-
-      // Called when the user presses the Start AR button
-      async function enableCamera() {
-        try {
-          // Trigger permission prompt explicitly (Chrome needs a gesture)
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: 'environment' } },
-            audio: false,
-          });
-          // Immediately stop the stream – AR.js will request it again internally
-          stream.getTracks().forEach((t) => t.stop());
-
-          // Hide overlay & show AR scene
-          startOverlay.style.display = 'none';
-          scene.style.display = 'block';
-        } catch (err) {
-          console.error('Camera permission denied', err);
-          startOverlay.style.display = 'none';
-          noCamDiv.hidden = false;
-        }
-      }
-
-      startButton.addEventListener('click', enableCamera);
-
-      // Detect camera init failure that happens after permission granted (e.g., other app using camera)
-      scene.addEventListener('arjs-video-error', (e) => {
-        console.error('Camera initialization failed', e);
-        noCamDiv.hidden = false;
-      });
-    </script>
-  </body>
+    marker.addEventListener('markerLost', () => {
+      hud.style.display = 'none';
+    });
+  </script>
+</body>
 </html>
