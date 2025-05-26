@@ -34,6 +34,33 @@
         z-index: 1000;
       }
 
+      /* Overlay that asks the user to start the camera (required on some browsers) */
+      #start-overlay {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        background: #000;
+        color: #fff;
+        gap: 1.25rem;
+        z-index: 999;
+      }
+
+      #start-button {
+        background: #16a34a;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.5rem;
+        font-size: 1.25rem;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+      }
+      #start-button:active {
+        transform: scale(0.96);
+      }
+
       /* Message shown when camera cannot be accessed */
       #no-camera {
         position: fixed;
@@ -51,8 +78,16 @@
   </head>
 
   <body>
-    <!-- On-screen feedback messages -->
+    <!-- On‑screen feedback messages -->
     <div id="status">detected</div>
+
+    <!-- Tap‑to‑start overlay (needed to trigger getUserMedia on some Chrome builds) -->
+    <div id="start-overlay">
+      <h2>👋 Tap to enable camera</h2>
+      <button id="start-button">Start AR</button>
+      <small>(Chrome requires user interaction over HTTPS or localhost)</small>
+    </div>
+
     <div id="no-camera" hidden>
       🚫 Unable to access the camera.<br />
       Make sure you've granted permission and are loading this page over
@@ -60,10 +95,12 @@
       file directly.
     </div>
 
-    <!-- AR.js scene -->
+    <!-- AR.js scene (hidden until permission granted) -->
     <a-scene
+      id="scene"
       vr-mode-ui="enabled: false"
       embedded
+      style="display: none;"
       arjs="trackingMethod: best; sourceType: webcam; facingMode: environment; debugUIEnabled: false;"
     >
       <!-- Pattern marker using your test.patt file -->
@@ -81,6 +118,9 @@
     </a-scene>
 
     <script>
+      const startOverlay = document.getElementById('start-overlay');
+      const startButton = document.getElementById('start-button');
+      const scene = document.getElementById('scene');
       const marker = document.querySelector('#marker');
       const statusDiv = document.getElementById('status');
       const noCamDiv = document.getElementById('no-camera');
@@ -94,18 +134,34 @@
         statusDiv.style.display = 'none';
       });
 
-      // Detect camera access failure (AR.js fires this event)
-      document
-        .querySelector('a-scene')
-        .addEventListener('arjs-video-error', (e) => {
-          console.error('Camera initialization failed', e);
-          noCamDiv.hidden = false;
-        });
+      // Called when the user presses the Start AR button
+      async function enableCamera() {
+        try {
+          // Trigger permission prompt explicitly (Chrome needs a gesture)
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: 'environment' } },
+            audio: false,
+          });
+          // Immediately stop the stream – AR.js will request it again internally
+          stream.getTracks().forEach((t) => t.stop());
 
-      // Extra fallback for browsers that don't fire the above event
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        noCamDiv.hidden = false;
+          // Hide overlay & show AR scene
+          startOverlay.style.display = 'none';
+          scene.style.display = 'block';
+        } catch (err) {
+          console.error('Camera permission denied', err);
+          startOverlay.style.display = 'none';
+          noCamDiv.hidden = false;
+        }
       }
+
+      startButton.addEventListener('click', enableCamera);
+
+      // Detect camera init failure that happens after permission granted (e.g., other app using camera)
+      scene.addEventListener('arjs-video-error', (e) => {
+        console.error('Camera initialization failed', e);
+        noCamDiv.hidden = false;
+      });
     </script>
   </body>
 </html>
